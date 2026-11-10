@@ -35,3 +35,8 @@ O banco do grupo já tem a origem e o clima carregados. **Não rode o script da 
 - **`CRE-EOL-07`:** é uma cópia repetida de `CRE-EOL-007` e é ignorada.
 - **`CRE-UFV-004`:** a latitude está positiva na origem. O sinal é corrigido só no pedido ao Open-Meteo, e a origem não é alterada.
 - **Coordenadas do Open-Meteo:** a API ajusta a coordenada para a grade do modelo. O valor ajustado fica guardado na `raw_clima`.
+
+## Fontes de dados
+
+- **PLD horário:** CCEE, portal de dados abertos (dadosabertos.ccee.org.br). Licença CC-BY 4.0.
+- **Clima:** Open-Meteo (open-meteo.com). Uso não comercial, com atribuição.

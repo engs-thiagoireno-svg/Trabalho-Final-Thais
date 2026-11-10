@@ -6,7 +6,7 @@ Aqui estão os testes que mostram o que o extrator faz quando a fonte dá proble
 
 - **Teste:** rodar `ccee_pld.py` com a CCEE bloqueada.
 - **Resultado:** a CCEE respondeu erro 403 nos dois anos. O extrator registrou `erro` no log, com 0 linhas gravadas, e não salvou nada pela metade.
-- **Prova:** print do log em `docs/evidencias/`.
+- **Prova:** linha `id_log = 3` da tabela `extracao.log_extracao`.
 
 ## 2. Fonte que não responde (timeout)
 
