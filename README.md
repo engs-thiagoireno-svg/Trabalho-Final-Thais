@@ -45,3 +45,54 @@ O banco do grupo já tem a origem e o clima carregados. **Não rode o script da 
 
 - **PLD horário:** CCEE, portal de dados abertos (dadosabertos.ccee.org.br). Licença CC-BY 4.0.
 - **Clima:** Open-Meteo (open-meteo.com). Uso não comercial, com atribuição.
+
+## Qualidade de dados (Etapa 2)
+
+Avalia as tabelas de origem (`campo_real_energia`) e as externas (`extracao.pld_horario`,
+`extracao.clima_horario`), grava as métricas no banco, gera dados limpos e quarentena no schema
+`qualidade` e mede o impacto da limpeza (antes × depois). A origem nunca é alterada.
+
+### Como rodar
+
+1. O script cria o schema `qualidade` sozinho (roda `sql/02_qualidade_ddl.sql`, que só cria o que não existe e não mexe nos outros schemas). Se preferir, dá para rodar esse arquivo no DBeaver com Alt+X.
+2. Confira se o seu `config/config.ini` tem a seção `[qualidade]` (veja `config/config.example.ini`).
+3. Instale as bibliotecas (`pip install -r requirements.txt`; a etapa 2 usa também o SQLAlchemy).
+4. Na raiz do projeto, rode:
+   ```
+   python -m src.qualidade.executar
+   ```
+   Precisa ser com `-m`, a partir da raiz, porque os arquivos da qualidade importam uns aos outros.
+
+Pode rodar quantas vezes quiser: métricas, profiling e antes × depois acumulam por `data_execucao`;
+as tabelas limpas e de quarentena são recriadas a cada execução. Se `extracao.pld_horario` estiver
+vazia (CCEE bloqueada), a qualidade do PLD aparece como 100% faltante e a receita não é calculada;
+quando o PLD for carregado, basta rodar de novo.
+
+Ao final, o script gera `docs/resultado_qualidade.md`, com cada regra que falhou, a decisão tomada e o antes × depois.
+
+### O que fica no schema `qualidade`
+
+| Tabela | Conteúdo |
+|---|---|
+| `metricas_qualidade` | 1 linha por regra × tabela × execução (na origem e na limpa) |
+| `decisoes` | decisão (corrigir, descartar, quarentena, sinalizar) e justificativa de cada regra |
+| `profiling` | perfil de cada coluna de cada tabela |
+| `antes_depois` | geração, fator de capacidade e receita, antes e depois da limpeza |
+| `usina_limpa` / `usina_quarentena` | cadastro corrigido / cadastro duplicado |
+| `parada_usina_limpa` / `parada_usina_quarentena` | paradas válidas / inválidas |
+| `medicao_geracao_limpa` / `medicao_geracao_quarentena` | medição limpa, com flags / registros separados, com o motivo |
+| `pld_horario_limpo` / `clima_horario_limpo` | PLD e clima prontos para o DW |
+
+**O DW carrega das tabelas `*_limpa` e `*_limpo`**, não da origem nem do schema `extracao`.
+
+### Código
+
+| Arquivo | Função |
+|---|---|
+| `src/qualidade/conexao.py` | lê o `config.ini` e conecta |
+| `src/qualidade/profiling.py` | perfil de qualquer tabela |
+| `src/qualidade/regras.py` | regras reutilizáveis, cobrindo as 7 dimensões |
+| `src/qualidade/decisoes.py` | decisão e justificativa de cada regra; correções de cadastro documentadas |
+| `src/qualidade/limpeza.py` | correção, deduplicação, quarentena e flags |
+| `src/qualidade/antes_depois.py` | indicadores antes × depois |
+| `src/qualidade/executar.py` | roda tudo e gera o resumo |
