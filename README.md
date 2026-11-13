@@ -96,3 +96,42 @@ Ao final, o script gera `docs/resultado_qualidade.md`, com cada regra que falhou
 | `src/qualidade/limpeza.py` | correção, deduplicação, quarentena e flags |
 | `src/qualidade/antes_depois.py` | indicadores antes × depois |
 | `src/qualidade/executar.py` | roda tudo e gera o resumo |
+
+## Modelagem Dimensional — Data Warehouse (Etapa 3)
+
+Constrói o Data Warehouse em formato **Star Schema** no schema `dw_campo_real`, carregando os dados já limpos e validados da Etapa 2 (`schema qualidade`) sem tocar nas tabelas de origem (`campo_real_energia`).
+
+### Como rodar
+
+No DBeaver (com **Alt+X**) ou via `psql`, execute na ordem:
+
+1. Criação das tabelas de dimensão, membros desconhecidos (`sk = -1`), tabelas fato e views analíticas:
+   ```sql
+   -- sql/03_dw_ddl.sql
+   ```
+2. Carga idempotente das dimensões (incluindo SCD Tipo 2 em `dim_usina`), fatos e consultas de validação:
+   ```sql
+   -- sql/04_dw_carga.sql
+   ```
+
+O schema `dw_campo_real` já está criado, carregado e validado no banco em nuvem do grupo (Neon).
+
+### O que fica no schema `dw_campo_real`
+
+| Tabela / View | Tipo | Grão (`1 linha =`) | Conteúdo |
+|---|---|---|---|
+| `dim_tempo` | Dimensão | 1 hora do calendário | 17.520 horas (2025 e 2026) + `sk = -1`, com feriado, dia útil, estação do ano (hemisfério sul) e patamar de carga (`Leve`, `Média`, `Pesada`) |
+| `dim_submercado` | Dimensão | 1 submercado | Os 4 submercados (`N`, `NE`, `S`, `SE`) + `sk = -1` |
+| `dim_fonte` | Dimensão | 1 fonte de energia | As 6 fontes (`UHE`, `PCH`, `UFV`, `EOL`, `BIO`, `UTE`) + `sk = -1` |
+| `dim_usina` | Dimensão (SCD2) | 1 versão histórica de usina | As 9 usinas limpas + `sk = -1`, com vigência (`vigencia_inicio`, `vigencia_fim`, `registro_atual`) e atributos de fonte e submercado achatados |
+| `dim_tipo_parada` | Dimensão | 1 tipo + motivo de parada | Catálogo de paradas (`Programada` / `Forçada` e motivo) + `sk = -1` |
+| `fato_geracao` | Fato | 1 usina em 1 hora | `energia_mwh`, `disponibilidade_mw`, `pld_rs_mwh`, `receita_rs` e flags (78.657 linhas; soma = 3.118.868,656 MWh) |
+| `fato_preco` | Fato | 1 submercado em 1 hora | `pld_rs_mwh` (carregado de `qualidade.pld_horario_limpo`) |
+| `fato_clima` | Fato | 1 usina (ponto de clima) em 1 hora | `temperatura_c`, `radiacao_wm2`, `vento_10m_ms`, `vento_100m_ms`, `vento_ms`, `chuva_mm` (78.840 linhas) |
+| `fato_parada` | Fato | 1 parada de 1 usina | `horas_parada`, `energia_nao_gerada_mwh` (pelo perfil horário típico da usina) e `receita_nao_gerada_rs` (10 paradas) |
+| `vw_geracao_analitica` | View | 1 usina em 1 hora | Visão consolidada juntando geração, usina, fonte, submercado, tempo, preço e clima |
+| `vw_qualidade_metricas` | View | 1 regra × tabela | Última execução de `qualidade.metricas_qualidade` + `decisoes` para a Pergunta 7 do painel |
+| `vw_qualidade_antes_depois` | View | 1 indicador × recorte | Última execução de `qualidade.antes_depois` para a Pergunta 7 do painel |
+
+A documentação completa da modelagem (matriz de barramento, grão, SCD, granularidades, dicionário de dados, diagrama do Star Schema e validações) está em `docs/modelagem_dw.md`.
+
